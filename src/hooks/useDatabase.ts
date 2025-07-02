@@ -83,6 +83,25 @@ export const useDatabase = () => {
     return stmt.run([person.organization_id, person.name, person.email, person.position, person.manager_id]);
   };
 
+  const updatePerson = (id: number, person: Partial<Omit<Person, 'id' | 'created_at'>>) => {
+    const db = getDatabase();
+    const stmt = db.prepare(`
+      UPDATE people 
+      SET name = COALESCE(?, name), 
+          email = COALESCE(?, email), 
+          position = COALESCE(?, position), 
+          manager_id = COALESCE(?, manager_id)
+      WHERE id = ?
+    `);
+    return stmt.run([person.name, person.email, person.position, person.manager_id, id]);
+  };
+
+  const deletePerson = (id: number) => {
+    const db = getDatabase();
+    const stmt = db.prepare('DELETE FROM people WHERE id = ?');
+    return stmt.run([id]);
+  };
+
   // Teams
   const getTeams = (): Team[] => {
     const db = getDatabase();
@@ -105,6 +124,18 @@ export const useDatabase = () => {
     const db = getDatabase();
     const stmt = db.prepare('INSERT INTO teams (organization_id, name) VALUES (?, ?)');
     return stmt.run([currentOrganization, name]);
+  };
+
+  const updateTeam = (id: number, name: string) => {
+    const db = getDatabase();
+    const stmt = db.prepare('UPDATE teams SET name = ? WHERE id = ?');
+    return stmt.run([name, id]);
+  };
+
+  const deleteTeam = (id: number) => {
+    const db = getDatabase();
+    const stmt = db.prepare('DELETE FROM teams WHERE id = ?');
+    return stmt.run([id]);
   };
 
   // Licenses
@@ -155,6 +186,27 @@ export const useDatabase = () => {
     return result;
   };
 
+  const updateLicense = (id: number, license: Partial<Omit<License, 'id' | 'created_at' | 'used_seats' | 'seats'>>) => {
+    const db = getDatabase();
+    const stmt = db.prepare(`
+      UPDATE licenses 
+      SET name = COALESCE(?, name), 
+          access_link = COALESCE(?, access_link), 
+          access_password = COALESCE(?, access_password), 
+          code = COALESCE(?, code), 
+          total_seats = COALESCE(?, total_seats), 
+          expiry_date = COALESCE(?, expiry_date)
+      WHERE id = ?
+    `);
+    return stmt.run([license.name, license.access_link, license.access_password, license.code, license.total_seats, license.expiry_date, id]);
+  };
+
+  const deleteLicense = (id: number) => {
+    const db = getDatabase();
+    const stmt = db.prepare('DELETE FROM licenses WHERE id = ?');
+    return stmt.run([id]);
+  };
+
   // Assets
   const getAssets = (): Asset[] => {
     const db = getDatabase();
@@ -174,6 +226,24 @@ export const useDatabase = () => {
       VALUES (?, ?, ?, ?)
     `);
     return stmt.run([asset.organization_id, asset.name, asset.serial_number, asset.person_id]);
+  };
+
+  const updateAsset = (id: number, asset: Partial<Omit<Asset, 'id' | 'created_at'>>) => {
+    const db = getDatabase();
+    const stmt = db.prepare(`
+      UPDATE assets 
+      SET name = COALESCE(?, name), 
+          serial_number = COALESCE(?, serial_number), 
+          person_id = COALESCE(?, person_id)
+      WHERE id = ?
+    `);
+    return stmt.run([asset.name, asset.serial_number, asset.person_id, id]);
+  };
+
+  const deleteAsset = (id: number) => {
+    const db = getDatabase();
+    const stmt = db.prepare('DELETE FROM assets WHERE id = ?');
+    return stmt.run([id]);
   };
 
   // Documents
@@ -197,6 +267,24 @@ export const useDatabase = () => {
     return stmt.run([document.organization_id, document.name, document.file_path, document.person_id]);
   };
 
+  const updateDocument = (id: number, document: Partial<Omit<Document, 'id' | 'created_at'>>) => {
+    const db = getDatabase();
+    const stmt = db.prepare(`
+      UPDATE documents 
+      SET name = COALESCE(?, name), 
+          file_path = COALESCE(?, file_path), 
+          person_id = COALESCE(?, person_id)
+      WHERE id = ?
+    `);
+    return stmt.run([document.name, document.file_path, document.person_id, id]);
+  };
+
+  const deleteDocument = (id: number) => {
+    const db = getDatabase();
+    const stmt = db.prepare('DELETE FROM documents WHERE id = ?');
+    return stmt.run([id]);
+  };
+
   return {
     currentOrganization,
     setCurrentOrganization,
@@ -204,13 +292,23 @@ export const useDatabase = () => {
     getDashboardStats,
     getPeople,
     addPerson,
+    updatePerson,
+    deletePerson,
     getTeams,
     addTeam,
+    updateTeam,
+    deleteTeam,
     getLicenses,
     addLicense,
+    updateLicense,
+    deleteLicense,
     getAssets,
     addAsset,
+    updateAsset,
+    deleteAsset,
     getDocuments,
-    addDocument
+    addDocument,
+    updateDocument,
+    deleteDocument
   };
 };

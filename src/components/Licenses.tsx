@@ -5,16 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Copy } from "lucide-react";
+import { Copy, Shield, edit, Trash } from "lucide-react";
 import { useDatabase } from "@/hooks/useDatabase";
 import { useToast } from "@/hooks/use-toast";
 import type { License } from "@/types";
 
 export const Licenses = () => {
-  const { getLicenses, addLicense, currentOrganization } = useDatabase();
+  const { getLicenses, addLicense, updateLicense, deleteLicense, currentOrganization } = useDatabase();
   const { toast } = useToast();
   const [licenses, setLicenses] = useState<License[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingLicense, setEditingLicense] = useState<License | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     access_link: '',
@@ -27,6 +29,10 @@ export const Licenses = () => {
   useEffect(() => {
     setLicenses(getLicenses());
   }, [currentOrganization]);
+
+  const resetForm = () => {
+    setFormData({ name: '', access_link: '', access_password: '', code: '', total_seats: 1, expiry_date: '' });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,7 +48,7 @@ export const Licenses = () => {
       });
       
       setLicenses(getLicenses());
-      setFormData({ name: '', access_link: '', access_password: '', code: '', total_seats: 1, expiry_date: '' });
+      resetForm();
       setIsDialogOpen(false);
       
       toast({
@@ -55,6 +61,71 @@ export const Licenses = () => {
         description: "Não foi possível adicionar a licença.",
         variant: "destructive"
       });
+    }
+  };
+
+  const handleEdit = (license: License) => {
+    setEditingLicense(license);
+    setFormData({
+      name: license.name,
+      access_link: license.access_link || '',
+      access_password: license.access_password || '',
+      code: license.code || '',
+      total_seats: license.total_seats,
+      expiry_date: license.expiry_date || ''
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdate = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!editingLicense) return;
+    
+    try {
+      updateLicense(editingLicense.id, {
+        ...formData,
+        access_link: formData.access_link || undefined,
+        access_password: formData.access_password || undefined,
+        code: formData.code || undefined,
+        expiry_date: formData.expiry_date || undefined
+      });
+      
+      setLicenses(getLicenses());
+      resetForm();
+      setIsEditDialogOpen(false);
+      setEditingLicense(null);
+      
+      toast({
+        title: "Licença atualizada",
+        description: `${formData.name} foi atualizada com sucesso.`
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar a licença.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDelete = (license: License) => {
+    if (confirm(`Tem certeza que deseja excluir ${license.name}?`)) {
+      try {
+        deleteLicense(license.id);
+        setLicenses(getLicenses());
+        
+        toast({
+          title: "Licença excluída",
+          description: `${license.name} foi excluída com sucesso.`
+        });
+      } catch (error) {
+        toast({
+          title: "Erro",
+          description: "Não foi possível excluir a licença.",
+          variant: "destructive"
+        });
+      }
     }
   };
 
@@ -82,7 +153,12 @@ export const Licenses = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">🧾 Licenças</h2>
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-red-100 rounded-lg">
+            <Shield className="h-6 w-6 text-red-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900">Licenças</h2>
+        </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button>Adicionar Licença</Button>
@@ -134,18 +210,83 @@ export const Licenses = () => {
         </Dialog>
       </div>
 
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Licença</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleUpdate} className="space-y-4">
+            <Input
+              placeholder="Nome da licença"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required
+            />
+            <Input
+              placeholder="Link de acesso"
+              value={formData.access_link}
+              onChange={(e) => setFormData({ ...formData, access_link: e.target.value })}
+            />
+            <Input
+              type="password"
+              placeholder="Senha de acesso"
+              value={formData.access_password}
+              onChange={(e) => setFormData({ ...formData, access_password: e.target.value })}
+            />
+            <Input
+              placeholder="Código (opcional)"
+              value={formData.code}
+              onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+            />
+            <Input
+              type="number"
+              placeholder="Total de seats"
+              min="1"
+              value={formData.total_seats}
+              onChange={(e) => setFormData({ ...formData, total_seats: Number(e.target.value) })}
+              required
+            />
+            <Input
+              type="date"
+              placeholder="Data de vencimento"
+              value={formData.expiry_date}
+              onChange={(e) => setFormData({ ...formData, expiry_date: e.target.value })}
+            />
+            <Button type="submit" className="w-full">Atualizar</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {licenses.map((license) => {
           const expiryStatus = getExpiryStatus(license.expiry_date);
           
           return (
-            <Card key={license.id}>
-              <CardHeader>
+            <Card key={license.id} className="hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
-                  <CardTitle className="text-lg">{license.name}</CardTitle>
-                  {expiryStatus && (
-                    <Badge variant={expiryStatus.variant}>{expiryStatus.text}</Badge>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-lg">{license.name}</CardTitle>
+                    {expiryStatus && (
+                      <Badge variant={expiryStatus.variant}>{expiryStatus.text}</Badge>
+                    )}
+                  </div>
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleEdit(license)}
+                    >
+                      <edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleDelete(license)}
+                    >
+                      <Trash className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">

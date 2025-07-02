@@ -6,16 +6,19 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Laptop, edit, Trash } from "lucide-react";
 import { useDatabase } from "@/hooks/useDatabase";
 import { useToast } from "@/hooks/use-toast";
 import type { Asset } from "@/types";
 
 export const Assets = () => {
-  const { getAssets, addAsset, getPeople, currentOrganization } = useDatabase();
+  const { getAssets, addAsset, updateAsset, deleteAsset, getPeople, currentOrganization } = useDatabase();
   const { toast } = useToast();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [people, setPeople] = useState(getPeople());
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     serial_number: '',
@@ -26,6 +29,10 @@ export const Assets = () => {
     setAssets(getAssets());
     setPeople(getPeople());
   }, [currentOrganization]);
+
+  const resetForm = () => {
+    setFormData({ name: '', serial_number: '', person_id: '' });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +46,7 @@ export const Assets = () => {
       });
       
       setAssets(getAssets());
-      setFormData({ name: '', serial_number: '', person_id: '' });
+      resetForm();
       setIsDialogOpen(false);
       
       toast({
@@ -55,10 +62,75 @@ export const Assets = () => {
     }
   };
 
+  const handleEdit = (asset: Asset) => {
+    setEditingAsset(asset);
+    setFormData({
+      name: asset.name,
+      serial_number: asset.serial_number || '',
+      person_id: asset.person_id?.toString() || ''
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdate = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!editingAsset) return;
+    
+    try {
+      updateAsset(editingAsset.id, {
+        name: formData.name,
+        serial_number: formData.serial_number || undefined,
+        person_id: formData.person_id ? Number(formData.person_id) : undefined
+      });
+      
+      setAssets(getAssets());
+      resetForm();
+      setIsEditDialogOpen(false);
+      setEditingAsset(null);
+      
+      toast({
+        title: "Ativo atualizado",
+        description: `${formData.name} foi atualizado com sucesso.`
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar o ativo.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDelete = (asset: Asset) => {
+    if (confirm(`Tem certeza que deseja excluir ${asset.name}?`)) {
+      try {
+        deleteAsset(asset.id);
+        setAssets(getAssets());
+        
+        toast({
+          title: "Ativo excluído",
+          description: `${asset.name} foi excluído com sucesso.`
+        });
+      } catch (error) {
+        toast({
+          title: "Erro",
+          description: "Não foi possível excluir o ativo.",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">💻 Ativos</h2>
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-green-100 rounded-lg">
+            <Laptop className="h-6 w-6 text-green-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900">Ativos</h2>
+        </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button>Adicionar Ativo</Button>
@@ -97,11 +169,63 @@ export const Assets = () => {
         </Dialog>
       </div>
 
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Ativo</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleUpdate} className="space-y-4">
+            <Input
+              placeholder="Nome do ativo"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required
+            />
+            <Input
+              placeholder="Número de série (opcional)"
+              value={formData.serial_number}
+              onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
+            />
+            <Select value={formData.person_id} onValueChange={(value) => setFormData({ ...formData, person_id: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Pessoa associada (opcional)" />
+              </SelectTrigger>
+              <SelectContent>
+                {people.map((person) => (
+                  <SelectItem key={person.id} value={person.id.toString()}>
+                    {person.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button type="submit" className="w-full">Atualizar</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {assets.map((asset) => (
-          <Card key={asset.id}>
-            <CardHeader>
-              <CardTitle className="text-lg">{asset.name}</CardTitle>
+          <Card key={asset.id} className="hover:shadow-lg transition-shadow">
+            <CardHeader className="pb-3">
+              <div className="flex justify-between items-start">
+                <CardTitle className="text-lg">{asset.name}</CardTitle>
+                <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleEdit(asset)}
+                  >
+                    <edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleDelete(asset)}
+                  >
+                    <Trash className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
               {asset.serial_number && (
