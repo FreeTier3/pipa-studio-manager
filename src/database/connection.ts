@@ -1,247 +1,176 @@
 
-import { DataStorage } from './storage';
+import Database from 'better-sqlite3';
 import { queries } from './queries';
 import type { PreparedStatement, QueryResult } from './types';
 
-class InMemoryDatabase {
-  private storage: DataStorage;
+class SQLiteDatabase {
+  private db: Database.Database;
 
   constructor() {
-    this.storage = new DataStorage();
-    console.log('In-memory database initialized successfully');
+    // Create in-memory SQLite database
+    this.db = new Database(':memory:');
+    this.initializeSchema();
+    console.log('SQLite database initialized successfully');
+  }
+
+  private initializeSchema(): void {
+    // Organizations
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS organizations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // People
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS people (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        organization_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL,
+        position TEXT,
+        manager_id INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (organization_id) REFERENCES organizations(id),
+        FOREIGN KEY (manager_id) REFERENCES people(id)
+      );
+    `);
+
+    // Teams
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS teams (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        organization_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (organization_id) REFERENCES organizations(id)
+      );
+    `);
+
+    // Team Members
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS team_members (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        team_id INTEGER NOT NULL,
+        person_id INTEGER NOT NULL,
+        FOREIGN KEY (team_id) REFERENCES teams(id),
+        FOREIGN KEY (person_id) REFERENCES people(id),
+        UNIQUE(team_id, person_id)
+      );
+    `);
+
+    // Licenses
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS licenses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        organization_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        access_link TEXT,
+        access_password TEXT,
+        code TEXT,
+        total_seats INTEGER DEFAULT 1,
+        expiry_date DATE,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (organization_id) REFERENCES organizations(id)
+      );
+    `);
+
+    // License Seats
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS license_seats (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        license_id INTEGER NOT NULL,
+        person_id INTEGER,
+        assigned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (license_id) REFERENCES licenses(id),
+        FOREIGN KEY (person_id) REFERENCES people(id)
+      );
+    `);
+
+    // Assets
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS assets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        organization_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        serial_number TEXT,
+        person_id INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (organization_id) REFERENCES organizations(id),
+        FOREIGN KEY (person_id) REFERENCES people(id)
+      );
+    `);
+
+    // Documents
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS documents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        organization_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        person_id INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (organization_id) REFERENCES organizations(id),
+        FOREIGN KEY (person_id) REFERENCES people(id)
+      );
+    `);
+
+    // Insert default organization
+    const stmt = this.db.prepare('INSERT OR IGNORE INTO organizations (id, name) VALUES (?, ?)');
+    stmt.run(1, 'Pipa Studios');
   }
 
   prepare(query: string): PreparedStatement {
+    const stmt = this.db.prepare(query);
+    
     return {
-      all: (params?: any[]) => this.executeQuery(query, params || []),
-      run: (params?: any[]) => this.executeInsert(query, params || []),
-      get: (params?: any[]) => this.executeQuery(query, params || [])[0]
+      all: (params?: any[]) => {
+        try {
+          return stmt.all(...(params || []));
+        } catch (error) {
+          console.error('Query error:', error, 'Query:', query, 'Params:', params);
+          return [];
+        }
+      },
+      run: (params?: any[]): QueryResult => {
+        try {
+          const result = stmt.run(...(params || []));
+          return {
+            lastInsertRowid: result.lastInsertRowid as number,
+            changes: result.changes
+          };
+        } catch (error) {
+          console.error('Query error:', error, 'Query:', query, 'Params:', params);
+          return { lastInsertRowid: 0, changes: 0 };
+        }
+      },
+      get: (params?: any[]) => {
+        try {
+          return stmt.get(...(params || []));
+        } catch (error) {
+          console.error('Query error:', error, 'Query:', query, 'Params:', params);
+          return undefined;
+        }
+      }
     };
   }
 
-  exec(schema: string): void {
-    console.log('Database schema initialized');
-  }
-
-  private executeQuery(query: string, params: any[]): any[] {
-    const lowerQuery = query.toLowerCase();
-    
-    // Organizations
-    if (lowerQuery.includes('select') && lowerQuery.includes('organizations')) {
-      return this.storage.getTable('organizations');
-    }
-    
-    // People queries
-    if (lowerQuery.includes('select') && lowerQuery.includes('people')) {
-      const people = this.storage.getTable('people');
-      const allPeople = this.storage.getTable('people');
-      
-      return people
-        .filter(person => !params[0] || person.organization_id === params[0])
-        .map(person => ({
-          ...person,
-          manager_name: allPeople.find(p => p.id === person.manager_id)?.name,
-          subordinates_count: allPeople.filter(p => p.manager_id === person.id).length,
-          assets_count: this.storage.getTable('assets').filter(a => a.person_id === person.id).length,
-          licenses_count: this.storage.getTable('license_seats').filter(ls => ls.person_id === person.id).length,
-          documents_count: this.storage.getTable('documents').filter(d => d.person_id === person.id).length
-        }));
-    }
-    
-    // Teams
-    if (lowerQuery.includes('select') && lowerQuery.includes('teams')) {
-      const teams = this.storage.getTable('teams');
-      return teams.filter(team => !params[0] || team.organization_id === params[0]);
-    }
-    
-    // Licenses
-    if (lowerQuery.includes('select') && lowerQuery.includes('licenses')) {
-      const licenses = this.storage.getTable('licenses');
-      return licenses
-        .filter(license => !params[0] || license.organization_id === params[0])
-        .map(license => ({
-          ...license,
-          used_seats: this.storage.getTable('license_seats')
-            .filter(ls => ls.license_id === license.id && ls.person_id).length
-        }));
-    }
-    
-    // License seats
-    if (lowerQuery.includes('select') && lowerQuery.includes('license_seats')) {
-      const seats = this.storage.getTable('license_seats');
-      const people = this.storage.getTable('people');
-      
-      return seats
-        .filter(seat => !params[0] || seat.license_id === params[0])
-        .map(seat => ({
-          ...seat,
-          person_name: people.find(p => p.id === seat.person_id)?.name
-        }));
-    }
-    
-    // Assets
-    if (lowerQuery.includes('select') && lowerQuery.includes('assets')) {
-      const assets = this.storage.getTable('assets');
-      const people = this.storage.getTable('people');
-      
-      return assets
-        .filter(asset => !params[0] || asset.organization_id === params[0])
-        .map(asset => ({
-          ...asset,
-          person_name: people.find(p => p.id === asset.person_id)?.name
-        }));
-    }
-    
-    // Documents
-    if (lowerQuery.includes('select') && lowerQuery.includes('documents')) {
-      const documents = this.storage.getTable('documents');
-      const people = this.storage.getTable('people');
-      
-      return documents
-        .filter(doc => !params[0] || doc.organization_id === params[0])
-        .map(doc => ({
-          ...doc,
-          person_name: people.find(p => p.id === doc.person_id)?.name
-        }));
-    }
-    
-    return [];
-  }
-
-  private executeInsert(query: string, params: any[]): QueryResult {
-    const lowerQuery = query.toLowerCase();
-    let lastInsertRowid = 0;
-    let changes = 0;
-    
-    if (lowerQuery.includes('insert into organizations')) {
-      lastInsertRowid = this.storage.insertIntoTable('organizations', {
-        name: params[0]
-      });
-      changes = 1;
-    } else if (lowerQuery.includes('update organizations')) {
-      const success = this.storage.updateInTable('organizations', params[1], {
-        name: params[0]
-      });
-      changes = success ? 1 : 0;
-    } else if (lowerQuery.includes('delete from organizations')) {
-      const success = this.storage.deleteFromTable('organizations', params[0]);
-      changes = success ? 1 : 0;
-    } else if (lowerQuery.includes('insert into people')) {
-      lastInsertRowid = this.storage.insertIntoTable('people', {
-        organization_id: params[0],
-        name: params[1],
-        email: params[2],
-        position: params[3],
-        manager_id: params[4]
-      });
-      changes = 1;
-    } else if (lowerQuery.includes('update people')) {
-      const success = this.storage.updateInTable('people', params[4], {
-        name: params[0],
-        email: params[1],
-        position: params[2],
-        manager_id: params[3]
-      });
-      changes = success ? 1 : 0;
-    } else if (lowerQuery.includes('delete from people')) {
-      const success = this.storage.deleteFromTable('people', params[0]);
-      changes = success ? 1 : 0;
-    } else if (lowerQuery.includes('insert into teams')) {
-      lastInsertRowid = this.storage.insertIntoTable('teams', {
-        organization_id: params[0],
-        name: params[1]
-      });
-      changes = 1;
-    } else if (lowerQuery.includes('update teams')) {
-      const success = this.storage.updateInTable('teams', params[1], {
-        name: params[0]
-      });
-      changes = success ? 1 : 0;
-    } else if (lowerQuery.includes('delete from teams')) {
-      const success = this.storage.deleteFromTable('teams', params[0]);
-      changes = success ? 1 : 0;
-    } else if (lowerQuery.includes('insert into licenses')) {
-      lastInsertRowid = this.storage.insertIntoTable('licenses', {
-        organization_id: params[0],
-        name: params[1],
-        access_link: params[2],
-        access_password: params[3],
-        code: params[4],
-        total_seats: params[5],
-        expiry_date: params[6]
-      });
-      changes = 1;
-    } else if (lowerQuery.includes('update licenses')) {
-      const success = this.storage.updateInTable('licenses', params[6], {
-        name: params[0],
-        access_link: params[1],
-        access_password: params[2],
-        code: params[3],
-        total_seats: params[4],
-        expiry_date: params[5]
-      });
-      changes = success ? 1 : 0;
-    } else if (lowerQuery.includes('delete from licenses')) {
-      const success = this.storage.deleteFromTable('licenses', params[0]);
-      changes = success ? 1 : 0;
-    } else if (lowerQuery.includes('insert into license_seats')) {
-      lastInsertRowid = this.storage.insertIntoTable('license_seats', {
-        license_id: params[0],
-        person_id: params[1] || null,
-        assigned_at: new Date().toISOString()
-      });
-      changes = 1;
-    } else if (lowerQuery.includes('insert into assets')) {
-      lastInsertRowid = this.storage.insertIntoTable('assets', {
-        organization_id: params[0],
-        name: params[1],
-        serial_number: params[2],
-        person_id: params[3]
-      });
-      changes = 1;
-    } else if (lowerQuery.includes('update assets')) {
-      const success = this.storage.updateInTable('assets', params[3], {
-        name: params[0],
-        serial_number: params[1],
-        person_id: params[2]
-      });
-      changes = success ? 1 : 0;
-    } else if (lowerQuery.includes('delete from assets')) {
-      const success = this.storage.deleteFromTable('assets', params[0]);
-      changes = success ? 1 : 0;
-    } else if (lowerQuery.includes('insert into documents')) {
-      lastInsertRowid = this.storage.insertIntoTable('documents', {
-        organization_id: params[0],
-        name: params[1],
-        file_path: params[2],
-        person_id: params[3]
-      });
-      changes = 1;
-    } else if (lowerQuery.includes('update documents')) {
-      const success = this.storage.updateInTable('documents', params[3], {
-        name: params[0],
-        file_path: params[1],
-        person_id: params[2]
-      });
-      changes = success ? 1 : 0;
-    } else if (lowerQuery.includes('delete from documents')) {
-      const success = this.storage.deleteFromTable('documents', params[0]);
-      changes = success ? 1 : 0;
-    }
-    
-    return { lastInsertRowid, changes };
+  exec(sql: string): void {
+    this.db.exec(sql);
   }
 
   close(): void {
-    // Cleanup se necessário
+    this.db.close();
   }
 }
 
-let db: InMemoryDatabase | null = null;
+let db: SQLiteDatabase | null = null;
 
-export const getDatabase = (): InMemoryDatabase => {
+export const getDatabase = (): SQLiteDatabase => {
   if (!db) {
-    db = new InMemoryDatabase();
+    db = new SQLiteDatabase();
   }
   return db;
 };
