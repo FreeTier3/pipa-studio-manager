@@ -1,5 +1,5 @@
 
-import { Home, Users, UserGroup, Shield, Laptop, FileText } from "lucide-react";
+import { Home, Users, Shield, Laptop, FileText } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
   Sidebar,
@@ -17,7 +17,7 @@ import {
 const menuItems = [
   { title: "Dashboard", url: "/", icon: Home },
   { title: "Pessoas", url: "/people", icon: Users },
-  { title: "Times", url: "/teams", icon: UserGroup },
+  { title: "Times", url: "/teams", icon: Users },
   { title: "Licenças", url: "/licenses", icon: Shield },
   { title: "Ativos", url: "/assets", icon: Laptop },
   { title: "Documentos", url: "/documents", icon: FileText },
