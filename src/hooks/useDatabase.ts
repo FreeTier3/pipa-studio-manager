@@ -32,7 +32,7 @@ export const useDatabase = () => {
       WHERE p.organization_id = ? 
       ORDER BY p.created_at DESC 
       LIMIT 5
-    `).all(currentOrganization) as Person[];
+    `).all([currentOrganization]) as Person[];
 
     const recent_assets = db.prepare(`
       SELECT a.*, p.name as person_name 
@@ -41,7 +41,7 @@ export const useDatabase = () => {
       WHERE a.organization_id = ? 
       ORDER BY a.created_at DESC 
       LIMIT 5
-    `).all(currentOrganization) as Asset[];
+    `).all([currentOrganization]) as Asset[];
 
     const expiring_licenses = db.prepare(`
       SELECT l.*, 
@@ -52,7 +52,7 @@ export const useDatabase = () => {
         AND DATE(l.expiry_date) <= DATE('now', '+30 days')
       ORDER BY l.expiry_date ASC 
       LIMIT 5
-    `).all(currentOrganization) as License[];
+    `).all([currentOrganization]) as License[];
 
     return { recent_people, recent_assets, expiring_licenses };
   };
@@ -71,7 +71,7 @@ export const useDatabase = () => {
       LEFT JOIN people m ON p.manager_id = m.id
       WHERE p.organization_id = ?
       ORDER BY p.name
-    `).all(currentOrganization) as Person[];
+    `).all([currentOrganization]) as Person[];
   };
 
   const addPerson = (person: Omit<Person, 'id' | 'created_at'>) => {
@@ -80,7 +80,7 @@ export const useDatabase = () => {
       INSERT INTO people (organization_id, name, email, position, manager_id)
       VALUES (?, ?, ?, ?, ?)
     `);
-    return stmt.run(person.organization_id, person.name, person.email, person.position, person.manager_id);
+    return stmt.run([person.organization_id, person.name, person.email, person.position, person.manager_id]);
   };
 
   // Teams
@@ -88,7 +88,7 @@ export const useDatabase = () => {
     const db = getDatabase();
     const teams = db.prepare(`
       SELECT * FROM teams WHERE organization_id = ? ORDER BY name
-    `).all(currentOrganization) as Team[];
+    `).all([currentOrganization]) as Team[];
 
     return teams.map(team => ({
       ...team,
@@ -97,14 +97,14 @@ export const useDatabase = () => {
         JOIN team_members tm ON p.id = tm.person_id
         WHERE tm.team_id = ?
         ORDER BY p.name
-      `).all(team.id) as Person[]
+      `).all([team.id]) as Person[]
     }));
   };
 
   const addTeam = (name: string) => {
     const db = getDatabase();
     const stmt = db.prepare('INSERT INTO teams (organization_id, name) VALUES (?, ?)');
-    return stmt.run(currentOrganization, name);
+    return stmt.run([currentOrganization, name]);
   };
 
   // Licenses
@@ -116,7 +116,7 @@ export const useDatabase = () => {
       FROM licenses l
       WHERE l.organization_id = ?
       ORDER BY l.name
-    `).all(currentOrganization) as License[];
+    `).all([currentOrganization]) as License[];
 
     return licenses.map(license => ({
       ...license,
@@ -126,7 +126,7 @@ export const useDatabase = () => {
         LEFT JOIN people p ON ls.person_id = p.id
         WHERE ls.license_id = ?
         ORDER BY ls.assigned_at
-      `).all(license.id) as LicenseSeat[]
+      `).all([license.id]) as LicenseSeat[]
     }));
   };
 
@@ -136,7 +136,7 @@ export const useDatabase = () => {
       INSERT INTO licenses (organization_id, name, access_link, access_password, code, total_seats, expiry_date)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
-    const result = stmt.run(
+    const result = stmt.run([
       license.organization_id, 
       license.name, 
       license.access_link, 
@@ -144,12 +144,12 @@ export const useDatabase = () => {
       license.code, 
       license.total_seats, 
       license.expiry_date
-    );
+    ]);
     
     // Criar seats vazios
     const seatStmt = db.prepare('INSERT INTO license_seats (license_id) VALUES (?)');
     for (let i = 0; i < license.total_seats; i++) {
-      seatStmt.run(result.lastInsertRowid);
+      seatStmt.run([result.lastInsertRowid]);
     }
     
     return result;
@@ -164,7 +164,7 @@ export const useDatabase = () => {
       LEFT JOIN people p ON a.person_id = p.id
       WHERE a.organization_id = ?
       ORDER BY a.name
-    `).all(currentOrganization) as Asset[];
+    `).all([currentOrganization]) as Asset[];
   };
 
   const addAsset = (asset: Omit<Asset, 'id' | 'created_at'>) => {
@@ -173,7 +173,7 @@ export const useDatabase = () => {
       INSERT INTO assets (organization_id, name, serial_number, person_id)
       VALUES (?, ?, ?, ?)
     `);
-    return stmt.run(asset.organization_id, asset.name, asset.serial_number, asset.person_id);
+    return stmt.run([asset.organization_id, asset.name, asset.serial_number, asset.person_id]);
   };
 
   // Documents
@@ -185,7 +185,7 @@ export const useDatabase = () => {
       LEFT JOIN people p ON d.person_id = p.id
       WHERE d.organization_id = ?
       ORDER BY d.name
-    `).all(currentOrganization) as Document[];
+    `).all([currentOrganization]) as Document[];
   };
 
   const addDocument = (document: Omit<Document, 'id' | 'created_at'>) => {
@@ -194,7 +194,7 @@ export const useDatabase = () => {
       INSERT INTO documents (organization_id, name, file_path, person_id)
       VALUES (?, ?, ?, ?)
     `);
-    return stmt.run(document.organization_id, document.name, document.file_path, document.person_id);
+    return stmt.run([document.organization_id, document.name, document.file_path, document.person_id]);
   };
 
   return {
