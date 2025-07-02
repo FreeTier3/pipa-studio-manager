@@ -4,15 +4,63 @@ import { Badge } from "@/components/ui/badge";
 import { useDatabase } from "@/hooks/useDatabase";
 import { useState, useEffect } from "react";
 import { Users, Laptop, Calendar, TrendingUp } from "lucide-react";
-import type { DashboardStats } from "@/types";
+import type { DashboardStats } from "@/database/types";
 
 export const Dashboard = () => {
   const { getDashboardStats, currentOrganization } = useDatabase();
   const [stats, setStats] = useState<DashboardStats>({ recent_people: [], recent_assets: [], expiring_licenses: [] });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setStats(getDashboardStats());
-  }, [currentOrganization]);
+    console.log('Dashboard useEffect triggered, currentOrganization:', currentOrganization);
+    try {
+      setLoading(true);
+      setError(null);
+      const dashboardStats = getDashboardStats();
+      console.log('Dashboard stats loaded:', dashboardStats);
+      setStats(dashboardStats);
+    } catch (err) {
+      console.error('Error loading dashboard stats:', err);
+      setError(err instanceof Error ? err.message : 'Erro desconhecido');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentOrganization, getDashboardStats]);
+
+  console.log('Dashboard render - loading:', loading, 'error:', error, 'stats:', stats);
+
+  if (loading) {
+    return (
+      <div className="space-y-8">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-purple-600">
+            <TrendingUp className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+            <p className="text-gray-600">Carregando dados...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-8">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-red-600 to-red-800">
+            <TrendingUp className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+            <p className="text-red-600">Erro: {error}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -37,7 +85,7 @@ export const Dashboard = () => {
                 <Users className="h-4 w-4 text-blue-600" />
               </div>
               <CardTitle className="text-lg font-semibold text-gray-900">
-                Últimas pessoas adicionadas
+                Últimas pessoas adicionadas ({stats.recent_people.length})
               </CardTitle>
             </div>
           </CardHeader>
@@ -76,7 +124,7 @@ export const Dashboard = () => {
                 <Laptop className="h-4 w-4 text-green-600" />
               </div>
               <CardTitle className="text-lg font-semibold text-gray-900">
-                Últimos ativos adicionados
+                Últimos ativos adicionados ({stats.recent_assets.length})
               </CardTitle>
             </div>
           </CardHeader>
@@ -115,7 +163,7 @@ export const Dashboard = () => {
                 <Calendar className="h-4 w-4 text-orange-600" />
               </div>
               <CardTitle className="text-lg font-semibold text-gray-900">
-                Licenças com vencimento próximo
+                Licenças com vencimento próximo ({stats.expiring_licenses.length})
               </CardTitle>
             </div>
           </CardHeader>

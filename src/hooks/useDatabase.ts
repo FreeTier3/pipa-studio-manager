@@ -10,15 +10,18 @@ import type {
   Document, 
   DashboardStats,
   LicenseSeat 
-} from '../types';
+} from '../database/types';
 
 export const useDatabase = () => {
   const [currentOrganization, setCurrentOrganization] = useState<number>(1);
 
   // Organizations
   const getOrganizations = (): Organization[] => {
+    console.log('Getting organizations...');
     const db = getDatabase();
-    return db.prepare(queries.organizations.selectAll).all() as Organization[];
+    const result = db.prepare(queries.organizations.selectAll).all() as Organization[];
+    console.log('Organizations result:', result);
+    return result;
   };
 
   const addOrganization = (name: string) => {
@@ -41,16 +44,23 @@ export const useDatabase = () => {
 
   // Dashboard
   const getDashboardStats = (): DashboardStats => {
+    console.log('Getting dashboard stats for organization:', currentOrganization);
     const db = getDatabase();
     
     const recent_people = db.prepare(queries.people.selectRecent).all([currentOrganization]) as Person[];
+    console.log('Recent people:', recent_people);
+    
     const recent_assets = db.prepare(queries.assets.selectRecent).all([currentOrganization]) as Asset[];
+    console.log('Recent assets:', recent_assets);
+    
     const expiring_licenses = db.prepare(queries.licenses.selectExpiring).all([currentOrganization]) as License[];
+    console.log('Expiring licenses:', expiring_licenses);
 
-    return { recent_people, recent_assets, expiring_licenses };
+    const stats = { recent_people, recent_assets, expiring_licenses };
+    console.log('Final dashboard stats:', stats);
+    return stats;
   };
 
-  // People
   const getPeople = (): Person[] => {
     const db = getDatabase();
     return db.prepare(queries.people.selectByOrg).all([currentOrganization]) as Person[];
@@ -74,7 +84,6 @@ export const useDatabase = () => {
     return stmt.run([id]);
   };
 
-  // Teams
   const getTeams = (): Team[] => {
     const db = getDatabase();
     const teams = db.prepare(queries.teams.selectByOrg).all([currentOrganization]) as Team[];
@@ -103,8 +112,6 @@ export const useDatabase = () => {
     return stmt.run([id]);
   };
 
-  
-  
   const getLicenses = (): License[] => {
     const db = getDatabase();
     const licenses = db.prepare(queries.licenses.selectByOrg).all([currentOrganization]) as License[];
@@ -128,7 +135,6 @@ export const useDatabase = () => {
       license.expiry_date
     ]);
     
-    // Criar seats vazios
     const seatStmt = db.prepare(queries.licenses.insertSeat);
     for (let i = 0; i < license.total_seats; i++) {
       seatStmt.run([result.lastInsertRowid, null]);
@@ -149,7 +155,6 @@ export const useDatabase = () => {
     return stmt.run([id]);
   };
 
-  // Assets
   const getAssets = (): Asset[] => {
     const db = getDatabase();
     return db.prepare(queries.assets.selectByOrg).all([currentOrganization]) as Asset[];
@@ -173,7 +178,6 @@ export const useDatabase = () => {
     return stmt.run([id]);
   };
 
-  // Documents
   const getDocuments = (): Document[] => {
     const db = getDatabase();
     return db.prepare(queries.documents.selectByOrg).all([currentOrganization]) as Document[];
