@@ -1,29 +1,31 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, edit, Trash } from "lucide-react";
+import { FileText, Edit, Trash, Upload } from "lucide-react";
 import { useDatabase } from "@/hooks/useDatabase";
 import { useToast } from "@/hooks/use-toast";
 import type { Document } from "@/types";
 
 export const Documents = () => {
-  const { getDocuments, addDocument, updateDocument, deleteDocument, getPeople, currentOrganization } = useDatabase();
+  const { getDocuments, addDocument, updateDocument, deleteDocument, getPeople, currentOrganization, uploadDocument } = useDatabase();
   const { toast } = useToast();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [people, setPeople] = useState(getPeople());
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingDocument, setEditingDocument] = useState<Document | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     file_path: '',
     person_id: ''
   });
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setDocuments(getDocuments());
@@ -34,8 +36,55 @@ export const Documents = () => {
     setFormData({ name: '', file_path: '', person_id: '' });
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      toast({
+        title: "Erro",
+        description: "Apenas arquivos PDF são permitidos.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    
+    try {
+      const filePath = await uploadDocument(file, formData.person_id ? Number(formData.person_id) : undefined);
+      setFormData(prev => ({ 
+        ...prev, 
+        file_path: filePath,
+        name: prev.name || file.name.replace('.pdf', '')
+      }));
+      
+      toast({
+        title: "Upload concluído",
+        description: "Arquivo carregado com sucesso."
+      });
+    } catch (error) {
+      toast({
+        title: "Erro no upload",
+        description: "Não foi possível carregar o arquivo.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!formData.file_path) {
+      toast({
+        title: "Erro",
+        description: "É necessário fazer upload de um arquivo PDF.",
+        variant: "destructive"
+      });
+      return;
+    }
     
     try {
       addDocument({
@@ -48,6 +97,10 @@ export const Documents = () => {
       setDocuments(getDocuments());
       resetForm();
       setIsDialogOpen(false);
+      
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       
       toast({
         title: "Documento adicionado",
@@ -108,6 +161,9 @@ export const Documents = () => {
         deleteDocument(document.id);
         setDocuments(getDocuments());
         
+        // Remover arquivo do localStorage
+        localStorage.removeItem(`document_${document.file_path}`);
+        
         toast({
           title: "Documento excluído",
           description: `${document.name} foi excluído com sucesso.`
@@ -123,10 +179,24 @@ export const Documents = () => {
   };
 
   const handleFileDownload = (filePath: string, fileName: string) => {
-    toast({
-      title: "Download",
-      description: `Iniciando download de ${fileName}`
-    });
+    const fileData = localStorage.getItem(`document_${filePath}`);
+    if (fileData) {
+      const link = document.createElement('a');
+      link.href = fileData;
+      link.download = fileName;
+      link.click();
+      
+      toast({
+        title: "Download iniciado",
+        description: `Download de ${fileName} iniciado.`
+      });
+    } else {
+      toast({
+        title: "Erro",
+        description: "Arquivo não encontrado.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -153,12 +223,22 @@ export const Documents = () => {
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 required
               />
-              <Input
-                placeholder="Caminho do arquivo PDF"
-                value={formData.file_path}
-                onChange={(e) => setFormData({ ...formData, file_path: e.target.value })}
-                required
-              />
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Upload PDF</label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="file"
+                    accept=".pdf"
+                    ref={fileInputRef}
+                    onChange={handleFileUpload}
+                    required={!formData.file_path}
+                  />
+                  {isUploading && <span className="text-sm text-gray-500">Carregando...</span>}
+                  {formData.file_path && <Upload className="h-4 w-4 text-green-500" />}
+                </div>
+              </div>
+              
               <Select value={formData.person_id} onValueChange={(value) => setFormData({ ...formData, person_id: value })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Pessoa associada (opcional)" />
@@ -171,7 +251,9 @@ export const Documents = () => {
                   ))}
                 </SelectContent>
               </Select>
-              <Button type="submit" className="w-full">Adicionar</Button>
+              <Button type="submit" className="w-full" disabled={isUploading}>
+                {isUploading ? 'Carregando...' : 'Adicionar'}
+              </Button>
             </form>
           </DialogContent>
         </Dialog>
@@ -187,12 +269,6 @@ export const Documents = () => {
               placeholder="Nome do documento"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required
-            />
-            <Input
-              placeholder="Caminho do arquivo PDF"
-              value={formData.file_path}
-              onChange={(e) => setFormData({ ...formData, file_path: e.target.value })}
               required
             />
             <Select value={formData.person_id} onValueChange={(value) => setFormData({ ...formData, person_id: value })}>
@@ -224,7 +300,7 @@ export const Documents = () => {
                     variant="ghost"
                     onClick={() => handleEdit(document)}
                   >
-                    <edit className="h-4 w-4" />
+                    <Edit className="h-4 w-4" />
                   </Button>
                   <Button
                     size="sm"

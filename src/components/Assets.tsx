@@ -1,12 +1,11 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Laptop, edit, Trash } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Laptop, Edit, Trash } from "lucide-react";
 import { useDatabase } from "@/hooks/useDatabase";
 import { useToast } from "@/hooks/use-toast";
 import type { Asset } from "@/types";
@@ -103,7 +102,7 @@ export const Assets = () => {
   };
 
   const handleDelete = (asset: Asset) => {
-    if (confirm(`Tem certeza que deseja excluir ${asset.name}?`)) {
+    if (confirm(`Tem certeza que deseja excluir o ativo ${asset.name}?`)) {
       try {
         deleteAsset(asset.id);
         setAssets(getAssets());
@@ -126,8 +125,8 @@ export const Assets = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-green-100 rounded-lg">
-            <Laptop className="h-6 w-6 text-green-600" />
+          <div className="p-2 bg-blue-100 rounded-lg">
+            <Laptop className="h-6 w-6 text-blue-600" />
           </div>
           <h2 className="text-2xl font-bold text-gray-900">Ativos</h2>
         </div>
@@ -215,7 +214,7 @@ export const Assets = () => {
                     variant="ghost"
                     onClick={() => handleEdit(asset)}
                   >
-                    <edit className="h-4 w-4" />
+                    <Edit className="h-4 w-4" />
                   </Button>
                   <Button
                     size="sm"
@@ -227,22 +226,16 @@ export const Assets = () => {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {asset.serial_number && (
-                <div>
-                  <span className="text-sm text-muted-foreground">Número de série: </span>
-                  <span className="text-sm font-mono">{asset.serial_number}</span>
-                </div>
-              )}
-              
-              {asset.person_name ? (
-                <Badge variant="secondary">Atribuído a: {asset.person_name}</Badge>
-              ) : (
-                <Badge variant="outline">Disponível</Badge>
-              )}
-              
-              <div className="text-xs text-muted-foreground">
-                Adicionado em: {new Date(asset.created_at).toLocaleDateString('pt-BR')}
+            <CardContent>
+              <div className="space-y-3">
+                {asset.serial_number && (
+                  <div className="text-sm text-muted-foreground">Série: {asset.serial_number}</div>
+                )}
+                {asset.person_name ? (
+                  <Badge variant="secondary">Associado a: {asset.person_name}</Badge>
+                ) : (
+                  <Badge variant="outline">Ativo geral</Badge>
+                )}
               </div>
             </CardContent>
           </Card>

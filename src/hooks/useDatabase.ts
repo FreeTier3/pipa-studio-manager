@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { getDatabase } from '../database/connection';
 import type { 
@@ -19,6 +18,24 @@ export const useDatabase = () => {
   const getOrganizations = (): Organization[] => {
     const db = getDatabase();
     return db.prepare('SELECT * FROM organizations ORDER BY name').all() as Organization[];
+  };
+
+  const addOrganization = (name: string) => {
+    const db = getDatabase();
+    const stmt = db.prepare('INSERT INTO organizations (name) VALUES (?)');
+    return stmt.run([name]);
+  };
+
+  const updateOrganization = (id: number, name: string) => {
+    const db = getDatabase();
+    const stmt = db.prepare('UPDATE organizations SET name = ? WHERE id = ?');
+    return stmt.run([name, id]);
+  };
+
+  const deleteOrganization = (id: number) => {
+    const db = getDatabase();
+    const stmt = db.prepare('DELETE FROM organizations WHERE id = ?');
+    return stmt.run([id]);
   };
 
   // Dashboard
@@ -267,6 +284,25 @@ export const useDatabase = () => {
     return stmt.run([document.organization_id, document.name, document.file_path, document.person_id]);
   };
 
+  const uploadDocument = (file: File, personId?: number): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      try {
+        // Simular upload para localStorage (em produção seria para um servidor)
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const result = e.target?.result as string;
+          const fileName = `${Date.now()}_${file.name}`;
+          localStorage.setItem(`document_${fileName}`, result);
+          resolve(fileName);
+        };
+        reader.onerror = () => reject(new Error('Erro ao ler arquivo'));
+        reader.readAsDataURL(file);
+      } catch (error) {
+        reject(error);
+      }
+    });
+  };
+
   const updateDocument = (id: number, document: Partial<Omit<Document, 'id' | 'created_at'>>) => {
     const db = getDatabase();
     const stmt = db.prepare(`
@@ -289,6 +325,9 @@ export const useDatabase = () => {
     currentOrganization,
     setCurrentOrganization,
     getOrganizations,
+    addOrganization,
+    updateOrganization,
+    deleteOrganization,
     getDashboardStats,
     getPeople,
     addPerson,
@@ -308,6 +347,7 @@ export const useDatabase = () => {
     deleteAsset,
     getDocuments,
     addDocument,
+    uploadDocument,
     updateDocument,
     deleteDocument
   };

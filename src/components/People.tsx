@@ -1,26 +1,21 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Copy, Users, Laptop, Shield, FileText, Trash, edit } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Users, Edit, Trash } from "lucide-react";
 import { useDatabase } from "@/hooks/useDatabase";
 import { useToast } from "@/hooks/use-toast";
 import type { Person } from "@/types";
 
 export const People = () => {
-  const { 
-    getPeople, 
-    addPerson, 
-    updatePerson, 
-    deletePerson, 
-    currentOrganization 
-  } = useDatabase();
+  const { getPeople, addPerson, updatePerson, deletePerson, getOrganizations, currentOrganization } = useDatabase();
   const { toast } = useToast();
   const [people, setPeople] = useState<Person[]>([]);
+  const [organizations, setOrganizations] = useState(getOrganizations());
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingPerson, setEditingPerson] = useState<Person | null>(null);
@@ -47,7 +42,7 @@ export const People = () => {
         organization_id: currentOrganization,
         name: formData.name,
         email: formData.email,
-        position: formData.position || undefined,
+        position: formData.position,
         manager_id: formData.manager_id ? Number(formData.manager_id) : undefined
       });
       
@@ -88,7 +83,7 @@ export const People = () => {
       updatePerson(editingPerson.id, {
         name: formData.name,
         email: formData.email,
-        position: formData.position || undefined,
+        position: formData.position,
         manager_id: formData.manager_id ? Number(formData.manager_id) : undefined
       });
       
@@ -130,14 +125,6 @@ export const People = () => {
     }
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast({
-      title: "Copiado!",
-      description: "E-mail copiado para a área de transferência."
-    });
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -163,8 +150,8 @@ export const People = () => {
                 required
               />
               <Input
+                placeholder="Email"
                 type="email"
-                placeholder="E-mail"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 required
@@ -176,7 +163,7 @@ export const People = () => {
               />
               <Select value={formData.manager_id} onValueChange={(value) => setFormData({ ...formData, manager_id: value })}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Superior imediato (opcional)" />
+                  <SelectValue placeholder="Gerente (opcional)" />
                 </SelectTrigger>
                 <SelectContent>
                   {people.map((person) => (
@@ -205,8 +192,8 @@ export const People = () => {
               required
             />
             <Input
+              placeholder="Email"
               type="email"
-              placeholder="E-mail"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               required
@@ -218,10 +205,10 @@ export const People = () => {
             />
             <Select value={formData.manager_id} onValueChange={(value) => setFormData({ ...formData, manager_id: value })}>
               <SelectTrigger>
-                <SelectValue placeholder="Superior imediato (opcional)" />
+                <SelectValue placeholder="Gerente (opcional)" />
               </SelectTrigger>
               <SelectContent>
-                {people.filter(p => p.id !== editingPerson?.id).map((person) => (
+                {people.map((person) => (
                   <SelectItem key={person.id} value={person.id.toString()}>
                     {person.name}
                   </SelectItem>
@@ -245,7 +232,7 @@ export const People = () => {
                     variant="ghost"
                     onClick={() => handleEdit(person)}
                   >
-                    <edit className="h-4 w-4" />
+                    <Edit className="h-4 w-4" />
                   </Button>
                   <Button
                     size="sm"
@@ -257,46 +244,19 @@ export const People = () => {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground flex-1">{person.email}</span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => copyToClipboard(person.email)}
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
-              </div>
-              
-              {person.position && (
-                <Badge variant="secondary">{person.position}</Badge>
-              )}
-              
-              {person.manager_name && (
-                <div className="text-sm">
-                  <span className="text-muted-foreground">Superior: </span>
-                  <span>{person.manager_name}</span>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="text-sm text-muted-foreground">
+                  {person.position}
                 </div>
-              )}
-              
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="flex items-center gap-1">
-                  <Users className="h-3 w-3 text-muted-foreground" />
-                  <span className="font-medium">{person.subordinates_count || 0}</span>
+                <div className="text-sm text-muted-foreground">
+                  Email: {person.email}
                 </div>
-                <div className="flex items-center gap-1">
-                  <Laptop className="h-3 w-3 text-muted-foreground" />
-                  <span className="font-medium">{person.assets_count || 0}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Shield className="h-3 w-3 text-muted-foreground" />
-                  <span className="font-medium">{person.licenses_count || 0}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <FileText className="h-3 w-3 text-muted-foreground" />
-                  <span className="font-medium">{person.documents_count || 0}</span>
-                </div>
+                {person.manager_name && (
+                  <Badge variant="secondary">
+                    Gerente: {person.manager_name}
+                  </Badge>
+                )}
               </div>
             </CardContent>
           </Card>

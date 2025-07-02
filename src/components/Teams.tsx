@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Users, edit, Trash } from "lucide-react";
+import { Users, Edit, Trash } from "lucide-react";
 import { useDatabase } from "@/hooks/useDatabase";
 import { useToast } from "@/hooks/use-toast";
 import type { Team } from "@/types";
@@ -155,7 +155,7 @@ export const Teams = () => {
                     variant="ghost"
                     onClick={() => handleEdit(team)}
                   >
-                    <edit className="h-4 w-4" />
+                    <Edit className="h-4 w-4" />
                   </Button>
                   <Button
                     size="sm"

@@ -1,4 +1,3 @@
-
 // Simulação de dados em memória para frontend
 // Em produção, isso seria substituído por uma API backend com SQLite real
 
@@ -89,7 +88,20 @@ class InMemoryDatabase {
     const lowerQuery = query.toLowerCase();
     const id = Date.now() + Math.floor(Math.random() * 1000);
     
-    if (lowerQuery.includes('insert into people')) {
+    if (lowerQuery.includes('insert into organizations')) {
+      this.data.organizations.push({
+        id,
+        name: params[0],
+        created_at: new Date().toISOString()
+      });
+    } else if (lowerQuery.includes('update organizations')) {
+      const orgIndex = this.data.organizations.findIndex(org => org.id === params[1]);
+      if (orgIndex !== -1) {
+        this.data.organizations[orgIndex].name = params[0];
+      }
+    } else if (lowerQuery.includes('delete from organizations')) {
+      this.data.organizations = this.data.organizations.filter(org => org.id !== params[0]);
+    } else if (lowerQuery.includes('insert into people')) {
       this.data.people.push({
         id,
         organization_id: params[0],
