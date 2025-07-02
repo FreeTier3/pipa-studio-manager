@@ -1,6 +1,5 @@
 
 import Database from 'better-sqlite3';
-import { queries } from './queries';
 import type { PreparedStatement, QueryResult } from './types';
 
 class SQLiteDatabase {
@@ -10,6 +9,7 @@ class SQLiteDatabase {
     // Create in-memory SQLite database
     this.db = new Database(':memory:');
     this.initializeSchema();
+    this.insertSampleData();
     console.log('SQLite database initialized successfully');
   }
 
@@ -116,10 +116,50 @@ class SQLiteDatabase {
         FOREIGN KEY (person_id) REFERENCES people(id)
       );
     `);
+  }
 
+  private insertSampleData(): void {
     // Insert default organization
-    const stmt = this.db.prepare('INSERT OR IGNORE INTO organizations (id, name) VALUES (?, ?)');
-    stmt.run(1, 'Pipa Studios');
+    const orgStmt = this.db.prepare('INSERT OR IGNORE INTO organizations (id, name) VALUES (?, ?)');
+    orgStmt.run(1, 'Pipa Studios');
+
+    // Insert sample people
+    const peopleStmt = this.db.prepare('INSERT OR IGNORE INTO people (id, organization_id, name, email, position) VALUES (?, ?, ?, ?, ?)');
+    peopleStmt.run(1, 1, 'João Silva', 'joao@pipastudios.com', 'Desenvolvedor Senior');
+    peopleStmt.run(2, 1, 'Maria Santos', 'maria@pipastudios.com', 'Designer UX/UI');
+    peopleStmt.run(3, 1, 'Pedro Costa', 'pedro@pipastudios.com', 'Gerente de Projeto');
+
+    // Insert sample teams
+    const teamsStmt = this.db.prepare('INSERT OR IGNORE INTO teams (id, organization_id, name) VALUES (?, ?, ?)');
+    teamsStmt.run(1, 1, 'Desenvolvimento');
+    teamsStmt.run(2, 1, 'Design');
+
+    // Insert team members
+    const memberStmt = this.db.prepare('INSERT OR IGNORE INTO team_members (team_id, person_id) VALUES (?, ?)');
+    memberStmt.run(1, 1); // João no time de Desenvolvimento
+    memberStmt.run(1, 3); // Pedro no time de Desenvolvimento
+    memberStmt.run(2, 2); // Maria no time de Design
+
+    // Insert sample assets
+    const assetsStmt = this.db.prepare('INSERT OR IGNORE INTO assets (id, organization_id, name, serial_number, person_id) VALUES (?, ?, ?, ?, ?)');
+    assetsStmt.run(1, 1, 'MacBook Pro 16"', 'MB123456', 1);
+    assetsStmt.run(2, 1, 'iPhone 15 Pro', 'IP789012', 2);
+    assetsStmt.run(3, 1, 'Monitor Dell 27"', 'DL345678', 3);
+
+    // Insert sample licenses
+    const licensesStmt = this.db.prepare('INSERT OR IGNORE INTO licenses (id, organization_id, name, total_seats, expiry_date) VALUES (?, ?, ?, ?, ?)');
+    licensesStmt.run(1, 1, 'Adobe Creative Suite', 5, '2024-12-31');
+    licensesStmt.run(2, 1, 'JetBrains IntelliJ', 3, '2024-11-15');
+    licensesStmt.run(3, 1, 'Figma Pro', 10, '2025-03-01');
+
+    // Insert license seats
+    const seatsStmt = this.db.prepare('INSERT OR IGNORE INTO license_seats (license_id, person_id) VALUES (?, ?)');
+    seatsStmt.run(1, 2); // Maria usando Adobe Creative Suite
+    seatsStmt.run(2, 1); // João usando JetBrains
+    seatsStmt.run(3, 2); // Maria usando Figma Pro
+    seatsStmt.run(3, 3); // Pedro usando Figma Pro
+
+    console.log('Sample data inserted successfully');
   }
 
   prepare(query: string): PreparedStatement {
@@ -128,7 +168,9 @@ class SQLiteDatabase {
     return {
       all: (params?: any[]) => {
         try {
-          return stmt.all(...(params || []));
+          const result = stmt.all(...(params || []));
+          console.log('Query executed:', query, 'Params:', params, 'Result:', result);
+          return result;
         } catch (error) {
           console.error('Query error:', error, 'Query:', query, 'Params:', params);
           return [];
@@ -137,6 +179,7 @@ class SQLiteDatabase {
       run: (params?: any[]): QueryResult => {
         try {
           const result = stmt.run(...(params || []));
+          console.log('Query executed:', query, 'Params:', params, 'Result:', result);
           return {
             lastInsertRowid: result.lastInsertRowid as number,
             changes: result.changes
@@ -148,7 +191,9 @@ class SQLiteDatabase {
       },
       get: (params?: any[]) => {
         try {
-          return stmt.get(...(params || []));
+          const result = stmt.get(...(params || []));
+          console.log('Query executed:', query, 'Params:', params, 'Result:', result);
+          return result;
         } catch (error) {
           console.error('Query error:', error, 'Query:', query, 'Params:', params);
           return undefined;
