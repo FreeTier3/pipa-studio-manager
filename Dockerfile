@@ -1,6 +1,13 @@
 
-# Use Node.js LTS version
-FROM node:18-alpine
+# Use Node.js LTS version with build tools
+FROM node:20-alpine
+
+# Install Python and build dependencies for better-sqlite3
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    sqlite
 
 # Set working directory
 WORKDIR /app
@@ -8,8 +15,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install dependencies (including dev dependencies needed for build)
+RUN npm ci
 
 # Copy source code
 COPY . .
