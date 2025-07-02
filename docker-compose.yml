@@ -1,0 +1,18 @@
+
+version: '3.8'
+
+services:
+  pipa-studios-app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    container_name: pipa-studios-container
+
+volumes:
+  data:
+    driver: local
